@@ -1,0 +1,12 @@
+
+[all]
+type-in-prefixes = [
+  "CLI:",
+  "File:"
+  "Acronym:"
+]
+
+[[decks]]
+id = 12345
+name = "Test Deck"
+description = "This is the description for the test deck"

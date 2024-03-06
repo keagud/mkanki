@@ -2,13 +2,13 @@ use genanki_rs::{
     basic_model, basic_type_in_the_answer_model, cloze_model, Deck, Field, Model, Note,
 };
 
-use std::ops::Deref;
 use itertools::Itertools;
 use markdown::to_html;
 use regex::Captures;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::io::{Read, Write};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 lazy_static::lazy_static! {
@@ -34,6 +34,18 @@ pub struct DeckConfig {
 
     #[serde(default)]
     type_in_prefixes: Vec<String>,
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+struct ConfigAll {
+    type_in_prefixes: Vec<String>
+}
+#[derive(Debug, Serialize, Deserialize)]
+struct Config {
+    #[serde(default)]
+    all: ConfigAll,
+    decks: Vec<DeckConfig>,
 }
 
 impl DeckConfig {
@@ -147,18 +159,26 @@ pub fn read_md_file(path: impl AsRef<Path>) -> crate::Result<Vec<NoteFields>> {
 pub fn read_config() -> crate::Result<Vec<DeckConfig>> {
     let config_path = concat!(env!("CARGO_MANIFEST_DIR"), "/test_assets/config.toml");
 
-    let config: toml::Value = toml::from_str(&std::fs::read_to_string(config_path)?)?;
+    let mut config: Config = toml::from_str(&std::fs::read_to_string(config_path)?)?;
 
-    let mut config_file_table = config.as_table().ok_or_else(|| "Can't read config file")?;
+    let deck_configs = if !config.all.type_in_prefixes.is_empty() {
+        config
+            .decks
+            .into_iter()
+            .map(|d| DeckConfig {
+                type_in_prefixes: d
+                    .type_in_prefixes
+                    .into_iter()
+                    .chain(config.all.type_in_prefixes.iter().cloned())
+                    .sorted()
+                    .dedup()
+                    .collect(),
+                ..d
+            })
+            .collect()
+    } else {
+        config.decks
+    };
 
-    let decks: Vec<DeckConfig> = config_file_table
-        .get("decks")
-        .ok_or_else(|| "At least one deck must be defined in config.toml")?
-        .as_array()
-        .ok_or_else(|| "Invalid config file")?
-        .into_iter()
-        .map( |val| val.deref().try_into().map_err(|_| "".into()))
-        .collect::<Result<Vec<_>, _>>()?;
-
-    todo!();
+    Ok(deck_configs)
 }

@@ -1,10 +1,6 @@
 
 [all]
-type-in-prefixes = [
-  "CLI:",
-  "File:"
-  "Acronym:"
-]
+type_in_prefixes = [ "CLI:", "File:", "Acronym:" ]
 
 [[decks]]
 id = 12345

@@ -1,10 +1,7 @@
-use std::path::PathBuf;
-use std::str::FromStr;
-
 use clap::Parser;
 use itertools::Itertools;
 use mkanki::cli::{Cli, CONFIG_FILE};
-use mkanki::mkanki::{read_config, read_multiple_md, make_deck_name};
+use mkanki::mkanki::{make_deck_name, read_config, read_multiple_md};
 
 fn main() -> mkanki::Result<()> {
     let mut cli = Cli::parse();
@@ -41,28 +38,29 @@ fn main() -> mkanki::Result<()> {
             }
         }
     } else {
-        configured_decks.into_iter().find(|d| d.is_default).ok_or_else(|| "Error parsing config file: no default deck found")?
+        configured_decks
+            .into_iter()
+            .find(|d| d.is_default)
+            .ok_or("Error parsing config file: no default deck found")?
     };
 
-    
-    let parsed_notes = read_multiple_md(&cli.input)?.into_iter().map(|n| n.to_note(&selected_deck)).collect::<Result<Vec<_>, _>>()?;
+    let parsed_notes = read_multiple_md(&cli.input)?
+        .into_iter()
+        .map(|n| n.to_note(&selected_deck))
+        .collect::<Result<Vec<_>, _>>()?;
 
     let mut deck = selected_deck.as_deck();
-
 
     for note in parsed_notes.into_iter() {
         deck.add_note(note);
     }
 
-
     let output_deck_file = match cli.output {
-        Some(f)   => f.canonicalize()?,
-        None => std::env::current_dir()?.join(&make_deck_name(&selected_deck.name))
+        Some(f) => f.canonicalize()?,
+        None => std::env::current_dir()?.join(make_deck_name(&selected_deck.name)),
     };
 
     deck.write_to_file(&output_deck_file.to_string_lossy())?;
-
-
 
     Ok(())
 }

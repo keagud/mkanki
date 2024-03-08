@@ -27,7 +27,5 @@ pub struct Cli {
     #[arg(short, long, value_name = "FILE")]
     pub deck: Option<String>,
 
-    pub input: String
-
-
+    pub input: String,
 }

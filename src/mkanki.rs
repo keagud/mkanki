@@ -2,20 +2,19 @@ use genanki_rs::{
     basic_model, basic_type_in_the_answer_model, cloze_model, Deck, Field, Model, Note,
 };
 
-
 use expanduser::expanduser;
-use sanitize_filename::sanitize;
-use itertools::Itertools;
 use glob::glob;
+use itertools::Itertools;
 use markdown::to_html;
 use regex::Captures;
+use sanitize_filename::sanitize;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::io::{Read, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::collections::HashSet;
 
 lazy_static::lazy_static! {
 
@@ -31,9 +30,6 @@ lazy_static::lazy_static! {
 }
 
 type DecksCollection = std::collections::HashMap<String, Deck>;
-
-
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DeckConfig {
@@ -67,14 +63,13 @@ impl DeckConfig {
             String::new()
         };
 
-        let mut deck = genanki_rs::Deck::new(self.id, &self.name, &desc);
-        deck
+        genanki_rs::Deck::new(self.id, &self.name, &desc)
     }
 }
 
-impl Into<genanki_rs::Deck> for DeckConfig {
-    fn into(self) -> genanki_rs::Deck {
-        genanki_rs::Deck::new(self.id, &self.name, &self.description.unwrap_or_default())
+impl From<DeckConfig> for genanki_rs::Deck {
+    fn from(val: DeckConfig) -> Self {
+        genanki_rs::Deck::new(val.id, &val.name, &val.description.unwrap_or_default())
     }
 }
 
@@ -103,7 +98,7 @@ impl NoteFields {
             let html_body_text = to_html(body_text.as_str());
             let full_html_text = format!("{header_html}\n{html_body_text}");
 
-            if let Some(clozes) = process_clozes(&full_html_text.as_ref()) {
+            if let Some(clozes) = process_clozes(full_html_text.as_ref()) {
                 Note::new(CLOZE_MODEL.to_owned(), vec![clozes.as_ref()])?
             } else {
                 Note::new(BASIC_MODEL.to_owned(), vec![&header_html, &html_body_text])?
@@ -115,7 +110,7 @@ impl NoteFields {
 }
 
 /// convert {{unnumbered}} {{clozes}} to {{c1::numbered}} {{c2::clozes}}
-pub fn process_clozes<'a>(cloze_text: &'a str) -> Option<Cow<'a, str>> {
+pub fn process_clozes(cloze_text: &str) -> Option<Cow<'_, str>> {
     let mut counter = 0usize;
 
     let rep = CLOZE_PATTERN.replace(cloze_text.as_ref(), |c: &Captures| -> String {
@@ -167,28 +162,22 @@ pub fn read_md_file(path: impl AsRef<Path>) -> crate::Result<Vec<NoteFields>> {
     Ok(notes)
 }
 
-
 pub fn read_multiple_md(path_or_glob: impl AsRef<str>) -> crate::Result<Vec<NoteFields>> {
-
-
     let files = if let Ok(globs) = glob(path_or_glob.as_ref()) {
         globs.into_iter().collect::<Result<Vec<_>, _>>()?
     } else {
         vec![expanduser(path_or_glob.as_ref())?]
     };
 
-
-    let all_notes = files.into_iter().map(|f| read_md_file(&f))
+    let all_notes = files
+        .into_iter()
+        .map(read_md_file)
         .collect::<Result<HashSet<_>, _>>()?
         .into_iter()
         .flatten()
         .collect_vec();
 
- 
     Ok(all_notes)
-
-
-
 }
 
 pub fn read_config(config_path: impl AsRef<Path>) -> crate::Result<Vec<DeckConfig>> {
@@ -220,13 +209,17 @@ pub fn read_config(config_path: impl AsRef<Path>) -> crate::Result<Vec<DeckConfi
     }
 }
 
-
 fn timestamp() -> u128 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("Time has failed").as_millis()
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("Time has failed")
+        .as_millis()
 }
 
-
 pub fn make_deck_name(deck_name: impl AsRef<str>) -> String {
-    format!("{}_{}.apkg", timestamp(),  sanitize_filename::sanitize(&deck_name.as_ref()))
-
+    format!(
+        "{}_{}.apkg",
+        timestamp(),
+        sanitize_filename::sanitize(deck_name.as_ref())
+    )
 }

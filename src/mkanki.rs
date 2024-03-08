@@ -2,7 +2,11 @@ use genanki_rs::{
     basic_model, basic_type_in_the_answer_model, cloze_model, Deck, Field, Model, Note,
 };
 
+
+use expanduser::expanduser;
+use sanitize_filename::sanitize;
 use itertools::Itertools;
+use glob::glob;
 use markdown::to_html;
 use regex::Captures;
 use serde::{Deserialize, Serialize};
@@ -10,12 +14,14 @@ use std::borrow::Cow;
 use std::io::{Read, Write};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
+use std::collections::HashSet;
 
 lazy_static::lazy_static! {
 
     static ref HEADER_PATTERN: regex::Regex = regex::Regex::new(r#"^##\s+(.+)"#).unwrap();
     static ref COMMENT_PATTERN: regex::Regex = regex::Regex::new(r#"^\s*<!--.*-->\s*$"#).unwrap();
-    static ref CLOZE_PATTERN: regex::Regex = regex::Regex::new(r#"{{(.+)}}"#).unwrap();
+    static ref CLOZE_PATTERN: regex::Regex = regex::Regex::new(r#"\{\{(.+)}}"#).unwrap();
 
 
     static ref TYPE_IN_ANSWER_MODEL: genanki_rs::Model = genanki_rs::basic_type_in_the_answer_model();
@@ -26,20 +32,25 @@ lazy_static::lazy_static! {
 
 type DecksCollection = std::collections::HashMap<String, Deck>;
 
+
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DeckConfig {
-    id: i64,
-    name: String,
-    description: Option<String>,
+    pub id: i64,
+    pub name: String,
+    pub description: Option<String>,
+
+    #[serde(default)]
+    pub is_default: bool,
 
     #[serde(default)]
     type_in_prefixes: Vec<String>,
 }
 
-
 #[derive(Debug, Serialize, Deserialize, Default)]
 struct ConfigAll {
-    type_in_prefixes: Vec<String>
+    type_in_prefixes: Vec<String>,
 }
 #[derive(Debug, Serialize, Deserialize)]
 struct Config {
@@ -67,7 +78,7 @@ impl Into<genanki_rs::Deck> for DeckConfig {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct NoteFields {
     header: String,
     body_lines: Vec<String>,
@@ -156,10 +167,32 @@ pub fn read_md_file(path: impl AsRef<Path>) -> crate::Result<Vec<NoteFields>> {
     Ok(notes)
 }
 
-pub fn read_config() -> crate::Result<Vec<DeckConfig>> {
-    let config_path = concat!(env!("CARGO_MANIFEST_DIR"), "/test_assets/config.toml");
 
-    let mut config: Config = toml::from_str(&std::fs::read_to_string(config_path)?)?;
+pub fn read_multiple_md(path_or_glob: impl AsRef<str>) -> crate::Result<Vec<NoteFields>> {
+
+
+    let files = if let Ok(globs) = glob(path_or_glob.as_ref()) {
+        globs.into_iter().collect::<Result<Vec<_>, _>>()?
+    } else {
+        vec![expanduser(path_or_glob.as_ref())?]
+    };
+
+
+    let all_notes = files.into_iter().map(|f| read_md_file(&f))
+        .collect::<Result<HashSet<_>, _>>()?
+        .into_iter()
+        .flatten()
+        .collect_vec();
+
+ 
+    Ok(all_notes)
+
+
+
+}
+
+pub fn read_config(config_path: impl AsRef<Path>) -> crate::Result<Vec<DeckConfig>> {
+    let mut config: Config = toml::from_str(&std::fs::read_to_string(config_path.as_ref())?)?;
 
     let deck_configs = if !config.all.type_in_prefixes.is_empty() {
         config
@@ -180,5 +213,20 @@ pub fn read_config() -> crate::Result<Vec<DeckConfig>> {
         config.decks
     };
 
-    Ok(deck_configs)
+    if deck_configs.iter().filter(|d| d.is_default).count() != 1 {
+        Err("Exactly one deck must have the 'is_default' field set to true".into())
+    } else {
+        Ok(deck_configs)
+    }
+}
+
+
+fn timestamp() -> u128 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).expect("Time has failed").as_millis()
+}
+
+
+pub fn make_deck_name(deck_name: impl AsRef<str>) -> String {
+    format!("{}_{}.apkg", timestamp(),  sanitize_filename::sanitize(&deck_name.as_ref()))
+
 }

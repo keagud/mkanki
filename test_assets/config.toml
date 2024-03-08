@@ -6,3 +6,9 @@ type_in_prefixes = [ "CLI:", "File:", "Acronym:" ]
 id = 12345
 name = "Test Deck"
 description = "This is the description for the test deck"
+is_default = true
+
+[[decks]]
+id = 54678
+name = "Deck 2"
+description = "This is another deck"

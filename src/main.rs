@@ -7,6 +7,7 @@ fn main() -> mkanki::Result<()> {
     let mut cli = Cli::parse();
 
     let config_file = cli.config.take().unwrap_or_else(|| CONFIG_FILE.clone());
+
     let configured_decks = read_config(&config_file)?;
 
     let selected_deck = if let Some(cli_deck_choice) = cli.deck {
@@ -55,10 +56,10 @@ fn main() -> mkanki::Result<()> {
         deck.add_note(note);
     }
 
-    let output_deck_file = match cli.output {
+    let output_deck_file = dbg!(match cli.output {
         Some(f) => f.canonicalize()?,
         None => std::env::current_dir()?.join(make_deck_name(&selected_deck.name)),
-    };
+    });
 
     deck.write_to_file(&output_deck_file.to_string_lossy())?;
 

@@ -3,10 +3,18 @@ use std::{path::PathBuf, str::FromStr};
 
 lazy_static::lazy_static! {
 
-    pub static ref CONFIG_FILE: PathBuf = std::env::var("USER")
+    pub static ref CONFIG_FILE: PathBuf =
+    if cfg!(debug_assertions) {
+
+        PathBuf::from_str(concat!(env!("CARGO_MANIFEST_DIR"), "/test_assets/config.toml")).unwrap()
+
+
+    }
+    else {
+        std::env::var("USER")
         .map(|user| PathBuf::from_str(&format!("/home/{user}/.config/mkanki.toml"))
             .expect("Invalid config file") )
-        .expect("Could not find user config directory");
+        .expect("Could not find user config directory")};
 
 
 

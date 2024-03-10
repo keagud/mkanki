@@ -19,8 +19,8 @@ use std::str::FromStr;
 lazy_static::lazy_static! {
 
     static ref HEADER_PATTERN: regex::Regex = regex::Regex::new(r#"^##\s+(.+)"#).unwrap();
-    static ref COMMENT_PATTERN: regex::Regex = regex::Regex::new(r#"^\s*<!--.*-->\s*$"#).unwrap();
-    static ref CLOZE_PATTERN: regex::Regex = regex::Regex::new(r#"\{\{(.+)}}"#).unwrap();
+    static ref COMMENT_PATTERN: regex::Regex = regex::Regex::new(r#"^\s*<!--.*?-->\s*$"#).unwrap();
+    static ref CLOZE_PATTERN: regex::Regex = regex::Regex::new(r#"\{\{(.+?)}}"#).unwrap();
 
 
     static ref TYPE_IN_ANSWER_MODEL: genanki_rs::Model = genanki_rs::basic_type_in_the_answer_model();
@@ -96,14 +96,16 @@ impl NoteFields {
             )?
         } else {
             let html_body_text = to_html(body_text.as_str());
-            let full_html_text = format!("{header_html}\n{html_body_text}");
+            let full_html_text = dbg!(format!("{header_html}\n{html_body_text}"));
 
             if let Some(clozes) = process_clozes(full_html_text.as_ref()) {
+                dbg!(&clozes);
                 Note::new(CLOZE_MODEL.to_owned(), vec![clozes.as_ref()])?
             } else {
                 Note::new(BASIC_MODEL.to_owned(), vec![&header_html, &html_body_text])?
             }
         };
+
 
         Ok(note)
     }
@@ -113,7 +115,7 @@ impl NoteFields {
 pub fn process_clozes(cloze_text: &str) -> Option<Cow<'_, str>> {
     let mut counter = 0usize;
 
-    let rep = CLOZE_PATTERN.replace(cloze_text.as_ref(), |c: &Captures| -> String {
+    let rep = CLOZE_PATTERN.replace_all(cloze_text.as_ref(), |c: &Captures| -> String {
         counter += 1;
         let text = c
             .get(1)

@@ -17,7 +17,6 @@ lazy_static::lazy_static! {
         .expect("Could not find user config directory")};
 
 
-
 }
 
 #[derive(Parser, Debug)]

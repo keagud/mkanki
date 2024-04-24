@@ -96,10 +96,9 @@ impl NoteFields {
             )?
         } else {
             let html_body_text = to_html(body_text.as_str());
-            let full_html_text = dbg!(format!("{header_html}\n{html_body_text}"));
+            let full_html_text = format!("{header_html}\n{html_body_text}");
 
             if let Some(clozes) = process_clozes(full_html_text.as_ref()) {
-                dbg!(&clozes);
                 Note::new(CLOZE_MODEL.to_owned(), vec![clozes.as_ref()])?
             } else {
                 Note::new(BASIC_MODEL.to_owned(), vec![&header_html, &html_body_text])?
